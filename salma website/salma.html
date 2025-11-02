@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>GhostLink Chat</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<style>
+body {
+    margin: 0;
+    padding: 0;
+    font-family: monospace;
+    background: black;
+    color: #ff69b4;
+}
+header {
+    background: #ff69b4;
+    color: black;
+    text-align: center;
+    padding: 10px;
+    font-size: 1.5em;
+}
+#chat {
+    height: 300px;
+    overflow-y: scroll;
+    padding: 10px;
+    border-bottom: 2px solid #ff69b4;
+}
+#chat div.new {
+    animation: flash 0.5s ease;
+}
+@keyframes flash {
+    0% { background-color: #ff69b4; color: black; }
+    100% { background-color: black; color: #ff69b4; }
+}
+input, button {
+    width: 80%;
+    margin: 5px 10%;
+    padding: 10px;
+    font-size: 1em;
+    border: 1px solid #ff69b4;
+    background: black;
+    color: #ff69b4;
+}
+button {
+    width: 30%;
+    margin-left: 35%;
+    cursor: pointer;
+    border-radius: 5px;
+}
+</style>
+</head>
+<body>
+<header>GhostLink Chat</header>
+<div id="chat"></div>
+<input type="text" id="message" placeholder="Type your message">
+<button onclick="sendMessage()">Send</button>
+
+<script>
+const SERVER_URL = "https://web-production-ea9fc.up.railway.app";
+let lastMessageCount = 0;
+
+// Request notification permission
+if ("Notification" in window && Notification.permission !== "granted") {
+    Notification.requestPermission();
+}
+
+function loadMessages() {
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", SERVER_URL + "/receive", true);
+    xhr.onreadystatechange = function() {
+        if(xhr.readyState === 4 && xhr.status === 200) {
+            try {
+                const data = JSON.parse(xhr.responseText);
+                const chatDiv = document.getElementById("chat");
+                chatDiv.innerHTML = "";
+
+                for(let i=0; i<data.length; i++){
+                    const div = document.createElement("div");
+                    div.innerHTML = "<b>" + data[i].sender + ":</b> " + data[i].text +
+                                    " <i>" + data[i].time + "</i>";
+                    // Highlight new messages
+                    if(i >= lastMessageCount) div.classList.add("new");
+                    chatDiv.appendChild(div);
+                }
+                chatDiv.scrollTop = chatDiv.scrollHeight;
+
+                // Notifications
+                if(data.length > lastMessageCount) {
+                    const newMsg = data[data.length-1];
+                    if(Notification.permission === "granted") {
+                        new Notification("GhostLink", { body: newMsg.sender + ": " + newMsg.text });
+                    }
+                    lastMessageCount = data.length;
+                }
+            } catch(e){ console.log("Error parsing messages", e); }
+        }
+    };
+    xhr.send();
+}
+
+function sendMessage() {
+    const msgInput = document.getElementById("message");
+    const msg = msgInput.value;
+    if(!msg) return;
+
+    var xhr = new XMLHttpRequest();
+    xhr.open("POST", SERVER_URL + "/send", true);
+    xhr.setRequestHeader("Content-Type", "application/json");
+    xhr.onreadystatechange = function() {
+        if(xhr.readyState === 4 && xhr.status === 200){
+            msgInput.value = "";
+            loadMessages();
+        }
+    };
+    xhr.send(JSON.stringify({ sender: "Salma", text: msg }));
+}
+
+// Auto-refresh every 3 seconds
+setInterval(loadMessages, 3000);
+window.onload = loadMessages;
+</script>
+</body>
+</html>
